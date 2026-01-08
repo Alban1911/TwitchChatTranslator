@@ -1,5 +1,7 @@
 # TwitchChatTranslator (DeepL Translator)
 
+![Icon preview](icon-display.jpg)
+
 Chrome Extension (Manifest V3) that **translates live Twitch chat messages** on `twitch.tv` using **DeepL** and injects the translation under each message.
 
 ## What it does
