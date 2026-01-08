@@ -18,8 +18,18 @@
 
   // Twitch may reuse the same message row DOM nodes; a "seen node" set can
   // cause us to miss new messages. Track last text per row instead.
-  const lastTextByRow = new WeakMap();
-  const lastTranslationByRow = new WeakMap();
+  let lastTextByRow = new WeakMap();
+  let lastTranslationByRow = new WeakMap();
+  // Track which *source* text we have successfully translated for this row.
+  let lastSourceTextTranslatedByRow = new WeakMap();
+  // Avoid duplicate in-flight translations for the same row/text.
+  let inFlightSourceTextByRow = new WeakMap();
+
+  // Throttle translations to avoid burst rate limits when translating a backlog.
+  const TRANSLATE_CONCURRENCY = 2;
+  const TRANSLATE_DELAY_MS = 50;
+  const translateQueue = [];
+  let translateActive = 0;
   let observer = null;
   let observedRoot = null;
   let attachIntervalId = null;
@@ -68,16 +78,34 @@
       : row.querySelector(MESSAGE_BODY_SELECTOR);
   }
 
+  function getOriginalTextContainer(row) {
+    // This is the element we hide in "replace" mode.
+    // - Live: message body span
+    // - VOD: the parent wrapper span containing the chat-message-text fragments
+    if (row.matches?.(VOD_MESSAGE_ROW_SELECTOR)) {
+      const frag = row.querySelector(TEXT_FRAGMENT_SELECTOR);
+      return frag?.parentElement || frag || null;
+    }
+    return row.querySelector(MESSAGE_BODY_SELECTOR);
+  }
+
   function applyDisplayMode(row, translationEl) {
-    const anchor = getAnchor(row);
-    if (!anchor) return;
+    const originalEl = getOriginalTextContainer(row);
+    if (!originalEl) return;
+
+    // Ensure the translation element is positioned correctly for the mode.
+    const desiredAnchor = displayMode === "replace" ? originalEl : getAnchor(row);
+    if (desiredAnchor?.insertAdjacentElement) {
+      const alreadyPlaced =
+        desiredAnchor.nextElementSibling === translationEl ||
+        translationEl.previousElementSibling === desiredAnchor;
+      if (!alreadyPlaced) desiredAnchor.insertAdjacentElement("afterend", translationEl);
+    }
 
     if (displayMode === "replace") {
-      // Hide the original message container, show translation in its place.
-      if (!anchor.hasAttribute(REPLACED_ATTR)) {
-        anchor.setAttribute(REPLACED_ATTR, "1");
-      }
-      anchor.style.display = "none";
+      // Hide the original message text, show translation in its place.
+      if (!originalEl.hasAttribute(REPLACED_ATTR)) originalEl.setAttribute(REPLACED_ATTR, "1");
+      originalEl.style.display = "none";
 
       translationEl.style.display = "inline";
       translationEl.style.fontSize = "";
@@ -85,8 +113,8 @@
       translationEl.style.marginTop = "0";
     } else {
       // Default: show translation under original.
-      anchor.removeAttribute(REPLACED_ATTR);
-      anchor.style.display = "";
+      originalEl.removeAttribute(REPLACED_ATTR);
+      originalEl.style.display = "";
 
       translationEl.style.display = "block";
       translationEl.style.fontSize = "12px";
@@ -102,6 +130,14 @@
       el.removeAttribute(REPLACED_ATTR);
       el.style.display = "";
     });
+
+    // Reset caches so enabling reprocesses currently rendered messages.
+    lastTextByRow = new WeakMap();
+    lastTranslationByRow = new WeakMap();
+    lastSourceTextTranslatedByRow = new WeakMap();
+    inFlightSourceTextByRow = new WeakMap();
+    translateQueue.length = 0;
+    translateActive = 0;
   }
 
   function ensureTranslationEl(row) {
@@ -135,39 +171,88 @@
     return res.translatedText;
   }
 
+  function enqueueTranslation(row, text) {
+    if (!enabled) return;
+    if (!row || !text) return;
+
+    // Avoid duplicating in-flight translation for this row/text.
+    if (inFlightSourceTextByRow.get(row) === text) return;
+
+    // If we already successfully translated this exact text for this row, skip.
+    if (lastSourceTextTranslatedByRow.get(row) === text) return;
+
+    inFlightSourceTextByRow.set(row, text);
+    translateQueue.push({ row, text, attempts: 0 });
+    pumpTranslateQueue();
+  }
+
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  async function pumpTranslateQueue() {
+    if (!enabled) return;
+    if (translateActive >= TRANSLATE_CONCURRENCY) return;
+    if (!translateQueue.length) return;
+
+    const job = translateQueue.shift();
+    if (!job) return;
+    translateActive += 1;
+
+    try {
+      const { row, text } = job;
+
+      if (!row.isConnected) return;
+      if (extractText(row) !== text) return;
+
+      const translated = await translateText(text);
+
+      lastSourceTextTranslatedByRow.set(row, text);
+      lastTranslationByRow.set(row, translated);
+
+      const scrollEl = findScrollContainer(row);
+      const shouldPin = isNearBottom(scrollEl);
+
+      const el = ensureTranslationEl(row);
+      el.textContent = translated;
+      applyDisplayMode(row, el);
+
+      if (shouldPin) scrollToBottom(scrollEl);
+    } catch (e) {
+      job.attempts += 1;
+      if (job.attempts <= 2 && enabled) {
+        // Backoff for transient errors/rate limits.
+        await sleep(800 * job.attempts);
+        // Clear inflight marker so it can be re-enqueued.
+        if (inFlightSourceTextByRow.get(job.row) === job.text) {
+          inFlightSourceTextByRow.delete(job.row);
+        }
+        enqueueTranslation(job.row, job.text);
+      }
+    } finally {
+      if (inFlightSourceTextByRow.get(job.row) === job.text) {
+        inFlightSourceTextByRow.delete(job.row);
+      }
+      translateActive -= 1;
+      await sleep(TRANSLATE_DELAY_MS);
+      pumpTranslateQueue();
+    }
+  }
+
   function handleRow(row) {
     const text = extractText(row);
     if (!text) return;
 
     const prevText = lastTextByRow.get(row);
-    if (prevText === text) return;
+    // If we already translated this exact text for this row, we can skip.
+    // Otherwise, even if the row was "seen" earlier, we still want to translate it.
+    if (prevText === text && lastSourceTextTranslatedByRow.get(row) === text) return;
     lastTextByRow.set(row, text);
 
     // eslint-disable-next-line no-console
     console.log("[TCT]", text);
 
-    // Translate + inject under the message. If translator is disabled or fails,
-    // we just skip injection (but keep extractor logs).
-    translateText(text)
-      .then((translated) => {
-        const prev = lastTranslationByRow.get(row);
-        if (prev === translated) return;
-        lastTranslationByRow.set(row, translated);
-
-        const scrollEl = findScrollContainer(row);
-        const shouldPin = isNearBottom(scrollEl);
-
-        const el = ensureTranslationEl(row);
-        el.textContent = translated;
-        applyDisplayMode(row, el);
-
-        // If the user is already at the bottom, keep the chat pinned so our
-        // extra line doesn't end up under the input box.
-        if (shouldPin) scrollToBottom(scrollEl);
-      })
-      .catch(() => {
-        // Keep console clean by default. (If you want debug logs later, we can add a flag.)
-      });
+    enqueueTranslation(row, text);
   }
 
   function closestMessageRow(fromNode) {
@@ -272,6 +357,9 @@
     }
 
     startOrRestart();
+    // After enabling, also translate any messages already rendered.
+    // (This will be throttled by the queue.)
+    document.querySelectorAll(MESSAGE_ROW_SELECTOR).forEach(handleRow);
     // eslint-disable-next-line no-console
     console.log("[TCT] enabled");
   }
