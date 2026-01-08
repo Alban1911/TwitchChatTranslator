@@ -27,17 +27,51 @@
     return text || null;
   }
 
+  function findScrollContainer(fromEl) {
+    let el = fromEl?.parentElement || null;
+    while (el) {
+      // Fast path: only consider elements that can actually scroll.
+      if (el.scrollHeight > el.clientHeight + 2) {
+        const style = window.getComputedStyle(el);
+        const oy = style?.overflowY;
+        if (oy === "auto" || oy === "scroll") return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function isNearBottom(scrollEl, thresholdPx = 8) {
+    if (!scrollEl) return false;
+    const distance =
+      scrollEl.scrollHeight - (scrollEl.scrollTop + scrollEl.clientHeight);
+    return distance <= thresholdPx;
+  }
+
+  function scrollToBottom(scrollEl) {
+    if (!scrollEl) return;
+    scrollEl.scrollTop = scrollEl.scrollHeight;
+  }
+
   function ensureTranslationEl(row) {
-    const body = row.querySelector(MESSAGE_BODY_SELECTOR) || row;
-    let el = body.querySelector(`.${TRANSLATION_CLASS}`);
+    // IMPORTANT: Twitch uses a <span> for the message body; inserting a <div>
+    // inside a <span> is invalid HTML and can cause layout/clipping issues.
+    // So we insert our translation element *after* the body span.
+    const bodySpan = row.querySelector(MESSAGE_BODY_SELECTOR);
+    let el = row.querySelector(`.${TRANSLATION_CLASS}`);
     if (!el) {
       el = document.createElement("div");
       el.className = TRANSLATION_CLASS;
+      el.style.display = "block";
       el.style.fontSize = "12px";
       el.style.opacity = "0.8";
       el.style.marginTop = "2px";
       el.style.userSelect = "text";
-      body.appendChild(el);
+      if (bodySpan?.insertAdjacentElement) {
+        bodySpan.insertAdjacentElement("afterend", el);
+      } else {
+        row.appendChild(el);
+      }
     }
     return el;
   }
@@ -67,8 +101,15 @@
         if (prev === translated) return;
         lastTranslationByRow.set(row, translated);
 
+        const scrollEl = findScrollContainer(row);
+        const shouldPin = isNearBottom(scrollEl);
+
         const el = ensureTranslationEl(row);
         el.textContent = translated;
+
+        // If the user is already at the bottom, keep the chat pinned so our
+        // extra line doesn't end up under the input box.
+        if (shouldPin) scrollToBottom(scrollEl);
       })
       .catch(() => {
         // Keep console clean by default. (If you want debug logs later, we can add a flag.)
