@@ -2,8 +2,14 @@
   const STORAGE_AREA = "sync";
   const STORAGE_KEY = "enabled";
 
-  const MESSAGE_ROW_SELECTOR =
+  // Live chat message rows vs VOD/replay chat message containers have different wrappers.
+  const LIVE_MESSAGE_ROW_SELECTOR =
     'div.chat-line__message[data-a-target="chat-line-message"]';
+  // On VOD/replays the message text is typically inside `div.video-chat__message`.
+  // This class is more stable than the random Layout-sc-* wrappers.
+  const VOD_MESSAGE_ROW_SELECTOR = "div.video-chat__message";
+  const MESSAGE_ROW_SELECTOR = `${LIVE_MESSAGE_ROW_SELECTOR}, ${VOD_MESSAGE_ROW_SELECTOR}`;
+
   const TEXT_FRAGMENT_SELECTOR = '[data-a-target="chat-message-text"]';
   const MESSAGE_BODY_SELECTOR = '[data-a-target="chat-line-message-body"]';
   const TRANSLATION_CLASS = "tct-translation";
@@ -54,10 +60,16 @@
   }
 
   function ensureTranslationEl(row) {
-    // IMPORTANT: Twitch uses a <span> for the message body; inserting a <div>
-    // inside a <span> is invalid HTML and can cause layout/clipping issues.
-    // So we insert our translation element *after* the body span.
-    const bodySpan = row.querySelector(MESSAGE_BODY_SELECTOR);
+    // IMPORTANT:
+    // - Live chat uses a <span> for the message body; inserting a <div> inside a
+    //   <span> is invalid HTML and can cause layout/clipping issues.
+    // - VOD/replay chat uses `div.video-chat__message` as the message container.
+    // So we always insert our translation element *after* the message container.
+    const anchor = row.matches?.(VOD_MESSAGE_ROW_SELECTOR)
+      ? row
+      : row.querySelector(MESSAGE_BODY_SELECTOR);
+
+    // Keep at most one translation element per message container.
     let el = row.querySelector(`.${TRANSLATION_CLASS}`);
     if (!el) {
       el = document.createElement("div");
@@ -67,8 +79,8 @@
       el.style.opacity = "0.8";
       el.style.marginTop = "2px";
       el.style.userSelect = "text";
-      if (bodySpan?.insertAdjacentElement) {
-        bodySpan.insertAdjacentElement("afterend", el);
+      if (anchor?.insertAdjacentElement) {
+        anchor.insertAdjacentElement("afterend", el);
       } else {
         row.appendChild(el);
       }
@@ -142,11 +154,18 @@
 
   function findObservedRoot() {
     // Twitch is a SPA; the chat list can re-mount. A robust heuristic is:
-    // find any message row, then observe its parent (the message list container).
+    // find any message row, then observe a stable container above it.
     const firstRow = document.querySelector(MESSAGE_ROW_SELECTOR);
+    if (!firstRow) return null;
+
+    // Prefer the scroll container if we can find it (works for both live and VOD layouts).
+    const scrollEl = findScrollContainer(firstRow);
+    if (scrollEl) return scrollEl;
+
+    // Live chat often has this data-test-selector.
     return (
-      firstRow?.closest?.('[data-test-selector="chat-scrollable-area__message-container"]') ||
-      firstRow?.parentElement ||
+      firstRow.closest?.('[data-test-selector="chat-scrollable-area__message-container"]') ||
+      firstRow.parentElement ||
       null
     );
   }
