@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TCT Extractor</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        padding: 10px;
+        width: 220px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .hint {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <input id="enabled" type="checkbox" />
+      <label for="enabled">Enable extractor</label>
+    </div>
+    <div class="hint">
+      When enabled, messages are logged in the page DevTools console as <code>[TCT]</code>.
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
+
+

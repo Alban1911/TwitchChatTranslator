@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Twitch Chat Translator (Extractor)",
+  "version": "0.1.0",
+  "description": "Extracts Twitch chat message text (MVP) and logs it while enabled.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://www.twitch.tv/*"],
+  "action": {
+    "default_title": "TCT Extractor",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.twitch.tv/*", "https://www.twitch.tv/popout/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+
+
