@@ -1,12 +1,12 @@
-# TwitchChatTranslator (Extractor MVP)
+# TwitchChatTranslator (DeepL Translator)
 
-Chrome Extension (Manifest V3) that **extracts live Twitch chat message text** from `twitch.tv` and logs it in the page DevTools console while enabled.
+Chrome Extension (Manifest V3) that **translates live Twitch chat messages** on `twitch.tv` using **DeepL** and injects the translation under each message.
 
-## What it does (right now)
+## What it does
 - Watches Twitch chat for new messages (handles Twitch DOM re-use / re-mounts).
-- Prints each message text to the console as:
-  - `[TCT] <message text>`
-- Has a popup toggle to enable/disable the extractor.
+- Translates each message via **DeepL** and injects a translated line under it.
+- Still logs extracted message text as `[TCT] ...` in the console.
+- Has a popup toggle to enable/disable the translator.
 
 ## Install (Load unpacked)
 1. Open Chrome and go to `chrome://extensions`
@@ -29,10 +29,12 @@ Tip: In the Console, filter for `[TCT]` to only see extractor logs.
 
 ## Files
 - `manifest.json`: Extension manifest (MV3)
-- `content.js`: Twitch chat observer + text extraction + logging
+- `content.js`: Twitch chat observer + text extraction + translation injection
 - `popup.html` / `popup.js`: Enable/disable toggle stored in `chrome.storage.sync`
+- `options.html` / `options.js`: Configure DeepL (endpoint + API key) and target language
+- `background.js`: DeepL translation + caching (service worker)
 
 ## Next steps
-Add translation (background/service worker + provider + options page) and inject translated text into the chat UI.
+Add quality improvements (language autodetect tuning, better UI styling, rate limiting, and per-channel settings).
 
 

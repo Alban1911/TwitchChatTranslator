@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Twitch Chat Translator - Options</title>
+    <style>
+      :root {
+        --fg: #111;
+        --muted: #666;
+        --bg: #fff;
+        --border: #ddd;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      .wrap {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        margin: 12px 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 10px 14px;
+        align-items: center;
+      }
+      label {
+        font-weight: 600;
+      }
+      input[type="text"],
+      input[type="password"],
+      select {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fafafa;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #111;
+        color: #fff;
+        border-color: #111;
+      }
+      .status {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+          "Courier New", monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Twitch Chat Translator — Options</h1>
+
+      <div class="card">
+        <div class="row">
+          <input id="enabled" type="checkbox" />
+          <label for="enabled">Enable translator</label>
+        </div>
+        <div class="muted" style="margin-top: 8px">
+          When enabled, the extension will translate each new chat message and inject a translated
+          line under it.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="grid">
+          <label for="targetLang">Target language</label>
+          <select id="targetLang">
+            <option value="en">English (en)</option>
+            <option value="fr">French (fr)</option>
+            <option value="es">Spanish (es)</option>
+            <option value="de">German (de)</option>
+            <option value="it">Italian (it)</option>
+            <option value="pt">Portuguese (pt)</option>
+            <option value="ru">Russian (ru)</option>
+            <option value="ja">Japanese (ja)</option>
+            <option value="ko">Korean (ko)</option>
+            <option value="zh">Chinese (zh)</option>
+          </select>
+
+          <label for="deeplEndpoint">DeepL endpoint</label>
+          <select id="deeplEndpoint">
+            <option value="https://api-free.deepl.com/v2/translate">Free API (api-free.deepl.com)</option>
+            <option value="https://api.deepl.com/v2/translate">Pro API (api.deepl.com)</option>
+          </select>
+
+          <label for="deeplAuthKey">DeepL API key</label>
+          <input id="deeplAuthKey" type="password" placeholder="Your DeepL auth key" />
+        </div>
+
+        <div class="muted" style="margin-top: 10px">
+          DeepL requires an API key.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <button id="save" class="primary">Save</button>
+          <button id="test">Test translation</button>
+          <span id="status" class="status"></span>
+        </div>
+        <div class="muted" style="margin-top: 10px">
+          Test uses the background service worker (same path the Twitch page will use).
+        </div>
+        <div id="testResult" class="muted mono" style="margin-top: 10px"></div>
+      </div>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>
+
+

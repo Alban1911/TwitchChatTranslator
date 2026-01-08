@@ -5,10 +5,13 @@
   const MESSAGE_ROW_SELECTOR =
     'div.chat-line__message[data-a-target="chat-line-message"]';
   const TEXT_FRAGMENT_SELECTOR = '[data-a-target="chat-message-text"]';
+  const MESSAGE_BODY_SELECTOR = '[data-a-target="chat-line-message-body"]';
+  const TRANSLATION_CLASS = "tct-translation";
 
   // Twitch may reuse the same message row DOM nodes; a "seen node" set can
   // cause us to miss new messages. Track last text per row instead.
   const lastTextByRow = new WeakMap();
+  const lastTranslationByRow = new WeakMap();
   let observer = null;
   let observedRoot = null;
   let attachIntervalId = null;
@@ -24,6 +27,27 @@
     return text || null;
   }
 
+  function ensureTranslationEl(row) {
+    const body = row.querySelector(MESSAGE_BODY_SELECTOR) || row;
+    let el = body.querySelector(`.${TRANSLATION_CLASS}`);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = TRANSLATION_CLASS;
+      el.style.fontSize = "12px";
+      el.style.opacity = "0.8";
+      el.style.marginTop = "2px";
+      el.style.userSelect = "text";
+      body.appendChild(el);
+    }
+    return el;
+  }
+
+  async function translateText(text) {
+    const res = await chrome.runtime.sendMessage({ type: "TRANSLATE", text });
+    if (!res?.ok) throw new Error(res?.error || "Translate failed");
+    return res.translatedText;
+  }
+
   function handleRow(row) {
     const text = extractText(row);
     if (!text) return;
@@ -32,10 +56,23 @@
     if (prevText === text) return;
     lastTextByRow.set(row, text);
 
-    // MVP behavior: just log the message text
-    // (Later: send to background for translation and inject UI)
     // eslint-disable-next-line no-console
     console.log("[TCT]", text);
+
+    // Translate + inject under the message. If translator is disabled or fails,
+    // we just skip injection (but keep extractor logs).
+    translateText(text)
+      .then((translated) => {
+        const prev = lastTranslationByRow.get(row);
+        if (prev === translated) return;
+        lastTranslationByRow.set(row, translated);
+
+        const el = ensureTranslationEl(row);
+        el.textContent = translated;
+      })
+      .catch(() => {
+        // Keep console clean by default. (If you want debug logs later, we can add a flag.)
+      });
   }
 
   function closestMessageRow(fromNode) {

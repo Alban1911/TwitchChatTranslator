@@ -1,13 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Twitch Chat Translator (Extractor)",
-  "version": "0.1.0",
-  "description": "Extracts Twitch chat message text (MVP) and logs it while enabled.",
+  "name": "Twitch Chat Translator",
+  "version": "0.2.0",
+  "description": "Translates live Twitch chat messages to a selected language.",
   "permissions": ["storage"],
-  "host_permissions": ["https://www.twitch.tv/*"],
+  "host_permissions": [
+    "https://www.twitch.tv/*",
+    "https://api-free.deepl.com/*",
+    "https://api.deepl.com/*"
+  ],
   "action": {
     "default_title": "TCT Extractor",
     "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
