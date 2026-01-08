@@ -32,15 +32,12 @@ Notes:
 ## Use
 1. Open a Twitch channel page (`https://www.twitch.tv/<channel>`) or popout chat.
 2. Click the extension icon.
-3. Toggle **Enable extractor** ON.
-4. Open the Twitch tab DevTools Console (F12) and look for:
-   - `[TCT] enabled`
-   - `[TCT] attached`
-   - `[TCT] ...` (message logs)
+3. Toggle **Enable translator** ON.
+4. New chat messages will be translated and the translation will be injected into the Twitch chat UI (under the message or replacing it, depending on your settings).
 
-To stop it, toggle OFF (you should see `[TCT] disabled`).
+To stop it, toggle OFF.
 
-Tip: In the Console, filter for `[TCT]` to only see extractor logs.
+Troubleshooting tip: If you open the Twitch tab DevTools Console (F12), you may see debug logs like `[TCT] enabled` / `[TCT] attached` / `[TCT] ...`.
 
 ## Files
 - `manifest.json`: Extension manifest (MV3)
