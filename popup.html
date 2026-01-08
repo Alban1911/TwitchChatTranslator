@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TCT Extractor</title>
+    <title>Twitch Chat Translator</title>
     <style>
       body {
         font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -20,15 +20,64 @@
         font-size: 12px;
         color: #666;
       }
+      label.title {
+        font-weight: 600;
+      }
+      label.field {
+        display: block;
+        margin-top: 10px;
+        font-size: 12px;
+        color: #555;
+        margin-bottom: 4px;
+      }
+      select {
+        width: 100%;
+        padding: 6px 8px;
+      }
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .status {
+        font-size: 12px;
+        color: #666;
+        white-space: nowrap;
+      }
     </style>
   </head>
   <body>
     <div class="row">
       <input id="enabled" type="checkbox" />
-      <label for="enabled">Enable extractor</label>
+      <label class="title" for="enabled">Enable translator</label>
     </div>
-    <div class="hint">
-      When enabled, messages are logged in the page DevTools console as <code>[TCT]</code>.
+    <label class="field" for="targetLang">Target language</label>
+    <select id="targetLang">
+      <option value="en">English (en)</option>
+      <option value="fr">French (fr)</option>
+      <option value="es">Spanish (es)</option>
+      <option value="de">German (de)</option>
+      <option value="it">Italian (it)</option>
+      <option value="pt">Portuguese (pt)</option>
+      <option value="ru">Russian (ru)</option>
+      <option value="ja">Japanese (ja)</option>
+      <option value="ko">Korean (ko)</option>
+      <option value="zh">Chinese (zh)</option>
+    </select>
+
+    <label class="field" for="displayMode">Display mode</label>
+    <select id="displayMode">
+      <option value="under">Under original</option>
+      <option value="replace">Replace original</option>
+    </select>
+
+    <div class="hint">Translations are injected under each message (or replace it) while enabled.</div>
+
+    <div class="footer">
+      <a id="openOptions" href="#">Options…</a>
+      <span id="status" class="status"></span>
     </div>
     <script src="popup.js"></script>
   </body>
