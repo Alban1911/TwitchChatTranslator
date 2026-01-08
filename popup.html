@@ -15,6 +15,50 @@
         align-items: center;
         gap: 8px;
       }
+      .grow {
+        flex: 1;
+      }
+      /* Toggle switch */
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        flex: 0 0 auto;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0.2s;
+        border-radius: 999px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.2s;
+        border-radius: 999px;
+      }
+      input:checked + .slider {
+        background-color: #111;
+      }
+      input:checked + .slider:before {
+        transform: translateX(20px);
+      }
       .hint {
         margin-top: 8px;
         font-size: 12px;
@@ -50,8 +94,14 @@
   </head>
   <body>
     <div class="row">
-      <input id="enabled" type="checkbox" />
-      <label class="title" for="enabled">Enable translator</label>
+      <div class="grow">
+        <div style="font-weight: 600">Translator</div>
+        <div style="font-size: 12px; color: #666" id="enabledLabel">Off</div>
+      </div>
+      <label class="switch" aria-label="Toggle translator">
+        <input id="enabled" type="checkbox" />
+        <span class="slider"></span>
+      </label>
     </div>
     <label class="field" for="targetLang">Target language</label>
     <select id="targetLang">

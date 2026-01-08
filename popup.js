@@ -1,5 +1,5 @@
 const DEFAULT_SETTINGS = {
-  enabled: true,
+  enabled: false,
   targetLang: "en",
   displayMode: "under", // "under" | "replace"
 };
@@ -10,11 +10,18 @@ function setStatus(text) {
   $("status").textContent = text || "";
 }
 
+function syncEnabledLabel() {
+  const el = $("enabledLabel");
+  if (!el) return;
+  el.textContent = $("enabled").checked ? "On" : "Off";
+}
+
 async function load() {
   const settings = await chrome.storage.sync.get(DEFAULT_SETTINGS);
   $("enabled").checked = !!settings.enabled;
   $("targetLang").value = settings.targetLang || "en";
   $("displayMode").value = settings.displayMode || "under";
+  syncEnabledLabel();
 }
 
 async function save(patch) {
@@ -23,6 +30,7 @@ async function save(patch) {
 
 function wire() {
   $("enabled").addEventListener("change", async () => {
+    syncEnabledLabel();
     setStatus("Saving…");
     await save({ enabled: $("enabled").checked });
     setStatus("Saved");

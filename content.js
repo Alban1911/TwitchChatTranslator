@@ -366,7 +366,7 @@
 
   // Initial state
   chrome.storage[STORAGE_AREA].get(
-    { [STORAGE_KEY]: true, [DISPLAY_MODE_KEY]: "under" },
+    { [STORAGE_KEY]: false, [DISPLAY_MODE_KEY]: "under" },
     (res) => {
       displayMode = res[DISPLAY_MODE_KEY] || "under";
       setEnabled(res[STORAGE_KEY]);

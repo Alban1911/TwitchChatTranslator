@@ -1,5 +1,5 @@
 const DEFAULT_SETTINGS = {
-  enabled: true,
+  enabled: false,
   deeplEndpoint: "https://api-free.deepl.com/v2/translate",
   deeplAuthKey: "",
   targetLang: "en",
