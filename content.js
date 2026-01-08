@@ -1,6 +1,7 @@
 (() => {
   const STORAGE_AREA = "sync";
   const STORAGE_KEY = "enabled";
+  const DISPLAY_MODE_KEY = "displayMode"; // "under" | "replace"
 
   // Live chat message rows vs VOD/replay chat message containers have different wrappers.
   const LIVE_MESSAGE_ROW_SELECTOR =
@@ -13,6 +14,7 @@
   const TEXT_FRAGMENT_SELECTOR = '[data-a-target="chat-message-text"]';
   const MESSAGE_BODY_SELECTOR = '[data-a-target="chat-line-message-body"]';
   const TRANSLATION_CLASS = "tct-translation";
+  const REPLACED_ATTR = "data-tct-replaced";
 
   // Twitch may reuse the same message row DOM nodes; a "seen node" set can
   // cause us to miss new messages. Track last text per row instead.
@@ -23,6 +25,7 @@
   let attachIntervalId = null;
 
   let enabled = true;
+  let displayMode = "under";
 
   function extractText(row) {
     const fragments = row.querySelectorAll(TEXT_FRAGMENT_SELECTOR);
@@ -59,15 +62,55 @@
     scrollEl.scrollTop = scrollEl.scrollHeight;
   }
 
+  function getAnchor(row) {
+    return row.matches?.(VOD_MESSAGE_ROW_SELECTOR)
+      ? row
+      : row.querySelector(MESSAGE_BODY_SELECTOR);
+  }
+
+  function applyDisplayMode(row, translationEl) {
+    const anchor = getAnchor(row);
+    if (!anchor) return;
+
+    if (displayMode === "replace") {
+      // Hide the original message container, show translation in its place.
+      if (!anchor.hasAttribute(REPLACED_ATTR)) {
+        anchor.setAttribute(REPLACED_ATTR, "1");
+      }
+      anchor.style.display = "none";
+
+      translationEl.style.display = "inline";
+      translationEl.style.fontSize = "";
+      translationEl.style.opacity = "";
+      translationEl.style.marginTop = "0";
+    } else {
+      // Default: show translation under original.
+      anchor.removeAttribute(REPLACED_ATTR);
+      anchor.style.display = "";
+
+      translationEl.style.display = "block";
+      translationEl.style.fontSize = "12px";
+      translationEl.style.opacity = "0.8";
+      translationEl.style.marginTop = "2px";
+    }
+  }
+
+  function cleanupInjected() {
+    // Restore any hidden originals and remove injected translations.
+    document.querySelectorAll(`.${TRANSLATION_CLASS}`).forEach((el) => el.remove());
+    document.querySelectorAll(`[${REPLACED_ATTR}]`).forEach((el) => {
+      el.removeAttribute(REPLACED_ATTR);
+      el.style.display = "";
+    });
+  }
+
   function ensureTranslationEl(row) {
     // IMPORTANT:
     // - Live chat uses a <span> for the message body; inserting a <div> inside a
     //   <span> is invalid HTML and can cause layout/clipping issues.
     // - VOD/replay chat uses `div.video-chat__message` as the message container.
     // So we always insert our translation element *after* the message container.
-    const anchor = row.matches?.(VOD_MESSAGE_ROW_SELECTOR)
-      ? row
-      : row.querySelector(MESSAGE_BODY_SELECTOR);
+    const anchor = getAnchor(row);
 
     // Keep at most one translation element per message container.
     let el = row.querySelector(`.${TRANSLATION_CLASS}`);
@@ -75,9 +118,7 @@
       el = document.createElement("div");
       el.className = TRANSLATION_CLASS;
       el.style.display = "block";
-      el.style.fontSize = "12px";
-      el.style.opacity = "0.8";
-      el.style.marginTop = "2px";
+      // Mode-specific styling is applied in applyDisplayMode().
       el.style.userSelect = "text";
       if (anchor?.insertAdjacentElement) {
         anchor.insertAdjacentElement("afterend", el);
@@ -118,6 +159,7 @@
 
         const el = ensureTranslationEl(row);
         el.textContent = translated;
+        applyDisplayMode(row, el);
 
         // If the user is already at the bottom, keep the chat pinned so our
         // extra line doesn't end up under the input box.
@@ -223,6 +265,7 @@
     enabled = !!nextEnabled;
     if (!enabled) {
       stopObserver();
+      cleanupInjected();
       // eslint-disable-next-line no-console
       console.log("[TCT] disabled");
       return;
@@ -234,15 +277,36 @@
   }
 
   // Initial state
-  chrome.storage[STORAGE_AREA].get({ [STORAGE_KEY]: true }, (res) => {
-    setEnabled(res[STORAGE_KEY]);
-  });
+  chrome.storage[STORAGE_AREA].get(
+    { [STORAGE_KEY]: true, [DISPLAY_MODE_KEY]: "under" },
+    (res) => {
+      displayMode = res[DISPLAY_MODE_KEY] || "under";
+      setEnabled(res[STORAGE_KEY]);
+    }
+  );
+
+  function setDisplayMode(nextMode) {
+    displayMode = nextMode === "replace" ? "replace" : "under";
+
+    // Re-apply mode to currently translated messages.
+    document.querySelectorAll(MESSAGE_ROW_SELECTOR).forEach((row) => {
+      const translated = lastTranslationByRow.get(row);
+      if (!translated) return;
+      const el = ensureTranslationEl(row);
+      el.textContent = translated;
+      applyDisplayMode(row, el);
+    });
+  }
 
   // React to toggle changes
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== STORAGE_AREA) return;
-    if (!changes[STORAGE_KEY]) return;
-    setEnabled(changes[STORAGE_KEY].newValue);
+    if (changes[DISPLAY_MODE_KEY]) {
+      setDisplayMode(changes[DISPLAY_MODE_KEY].newValue);
+    }
+    if (changes[STORAGE_KEY]) {
+      setEnabled(changes[STORAGE_KEY].newValue);
+    }
   });
 })();
 

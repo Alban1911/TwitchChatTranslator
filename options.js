@@ -1,5 +1,6 @@
 const DEFAULT_SETTINGS = {
   enabled: true,
+  displayMode: "under", // "under" | "replace"
   deeplEndpoint: "https://api-free.deepl.com/v2/translate",
   deeplAuthKey: "",
   targetLang: "en",
@@ -21,6 +22,7 @@ function readForm() {
   return {
     enabled: $("enabled").checked,
     targetLang: $("targetLang").value,
+    displayMode: $("displayMode").value,
     deeplEndpoint: $("deeplEndpoint").value,
     deeplAuthKey: $("deeplAuthKey").value,
   };
@@ -29,6 +31,7 @@ function readForm() {
 function writeForm(settings) {
   $("enabled").checked = !!settings.enabled;
   $("targetLang").value = settings.targetLang || "en";
+  $("displayMode").value = settings.displayMode || "under";
   $("deeplEndpoint").value =
     settings.deeplEndpoint || DEFAULT_SETTINGS.deeplEndpoint;
   $("deeplAuthKey").value = settings.deeplAuthKey || "";
