@@ -34,6 +34,22 @@ async function getSettings() {
   return await chrome.storage.sync.get(DEFAULT_SETTINGS);
 }
 
+function setBadge(enabled) {
+  // Chrome badge area is visually large; keep it to 1 character.
+  const text = enabled ? "✓" : "×";
+  chrome.action.setBadgeText({ text });
+  chrome.action.setBadgeBackgroundColor({ color: enabled ? "#0F7B0F" : "#777777" });
+  chrome.action.setBadgeTextColor({ color: "#FFFFFF" });
+  chrome.action.setTitle({ title: enabled ? "Twitch Chat Translator: On" : "Twitch Chat Translator: Off" });
+}
+
+async function syncBadgeFromStorage() {
+  const { enabled } = await chrome.storage.sync.get({
+    enabled: DEFAULT_SETTINGS.enabled,
+  });
+  setBadge(!!enabled);
+}
+
 function normalizeDeeplLang(lang) {
   if (!lang) return null;
   // DeepL expects uppercase, and supports regional variants like EN-GB, PT-BR, etc.
@@ -124,5 +140,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Keep the message channel open for async sendResponse.
   return true;
 });
+
+// Keep the action badge in sync with the enabled state.
+chrome.runtime.onInstalled.addListener(() => {
+  syncBadgeFromStorage().catch(() => {});
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "sync") return;
+  if (!changes.enabled) return;
+  setBadge(!!changes.enabled.newValue);
+});
+
+// Service worker can start without UI; sync once on load as well.
+syncBadgeFromStorage().catch(() => {});
 
 
