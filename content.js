@@ -37,13 +37,126 @@
   let enabled = true;
   let displayMode = "under";
 
+  function isInOurTranslationEl(node) {
+    return !!node?.closest?.(`.${TRANSLATION_CLASS}`);
+  }
+
+  function isInEmoteButton(node) {
+    return (
+      !!node?.closest?.('[data-test-selector="emote-button"]') ||
+      !!node?.closest?.(".chat-line__message--emote-button")
+    );
+  }
+
+  function isInsideBttvTooltip(node) {
+    return !!node?.closest?.(".bttv-tooltip");
+  }
+
+  function getMessageTextElements(row) {
+    // NOTE: We must NOT traverse the whole chat line container because:
+    // - Twitch includes an "emote button" element inside the message body.
+    // - BTTV includes tooltip DOM that contains extra text ("Chaîne ...").
+    // - We inject our own translation element.
+    return Array.from(row.querySelectorAll(TEXT_FRAGMENT_SELECTOR)).filter(
+      (el) => !isInOurTranslationEl(el) && !isInEmoteButton(el)
+    );
+  }
+
+  function buildTranslationPayload(row) {
+    const textEls = getMessageTextElements(row);
+    if (!textEls.length) return null;
+
+    let out = "";
+    const emotes = new Map(); // token -> { alt, src, srcset, className }
+    let i = 0;
+
+    const walk = (node) => {
+      if (!node) return;
+
+      if (node.nodeType === Node.TEXT_NODE) {
+        out += node.textContent || "";
+        return;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const el = /** @type {HTMLElement} */ (node);
+
+      // Skip BTTV tooltip content entirely (it contains text we don't want to translate).
+      if (el.classList?.contains("bttv-tooltip") || isInsideBttvTooltip(el)) return;
+
+      if (el.tagName === "IMG") {
+        const alt = el.getAttribute("alt") || "";
+        const src = el.getAttribute("src") || "";
+        const srcset = el.getAttribute("srcset") || "";
+        const className = el.getAttribute("class") || "";
+
+        // Only treat as an emote if it has an alt (emote code) and some src.
+        if (alt && src) {
+          const token = `__TCT_EMOTE_${i}__`;
+          i += 1;
+          emotes.set(token, { alt, src, srcset, className });
+          out += ` ${token} `;
+        }
+        return;
+      }
+
+      for (const child of Array.from(el.childNodes)) walk(child);
+    };
+
+    for (const el of textEls) walk(el);
+
+    let sourceText = out.replace(/\s+/g, " ").trim();
+    // VOD messages often include a leading ":" span inside the container.
+    sourceText = sourceText.replace(/^:\s*/, "");
+    if (!sourceText) return null;
+
+    // For translation we send placeholders, but for cache/identity we also use the same
+    // placeholderized string (stable and avoids timing issues with emote rendering).
+    return {
+      sourceText,
+      toTranslate: sourceText,
+      emotes,
+    };
+  }
+
   function extractText(row) {
-    const fragments = row.querySelectorAll(TEXT_FRAGMENT_SELECTOR);
-    const text = Array.from(fragments)
-      .map((n) => n.textContent || "")
-      .join("")
-      .trim();
-    return text || null;
+    return buildTranslationPayload(row)?.sourceText || null;
+  }
+
+  function renderTranslated(el, translatedText, emotes) {
+    // Render translated text with emote placeholders replaced by <img> elements cloned
+    // from the original message's emote images.
+    el.textContent = "";
+    if (!translatedText) return;
+
+    const re = /__TCT_EMOTE_\d+__/g;
+    let lastIndex = 0;
+    let match = null;
+
+    while ((match = re.exec(translatedText))) {
+      const token = match[0];
+      const before = translatedText.slice(lastIndex, match.index);
+      if (before) el.appendChild(document.createTextNode(before));
+
+      const meta = emotes?.get?.(token);
+      if (meta) {
+        const img = document.createElement("img");
+        img.setAttribute("alt", meta.alt);
+        if (meta.className) img.setAttribute("class", meta.className);
+        if (meta.src) img.setAttribute("src", meta.src);
+        if (meta.srcset) img.setAttribute("srcset", meta.srcset);
+        img.setAttribute("loading", "lazy");
+        el.appendChild(img);
+      } else {
+        // If we can't resolve the token, leave it as text.
+        el.appendChild(document.createTextNode(token));
+      }
+
+      lastIndex = match.index + token.length;
+    }
+
+    const after = translatedText.slice(lastIndex);
+    if (after) el.appendChild(document.createTextNode(after));
   }
 
   function findScrollContainer(fromEl) {
@@ -171,18 +284,25 @@
     return res.translatedText;
   }
 
-  function enqueueTranslation(row, text) {
+  function enqueueTranslation(row, payload) {
     if (!enabled) return;
-    if (!row || !text) return;
+    if (!row || !payload?.sourceText || !payload?.toTranslate) return;
+    const sourceText = payload.sourceText;
 
     // Avoid duplicating in-flight translation for this row/text.
-    if (inFlightSourceTextByRow.get(row) === text) return;
+    if (inFlightSourceTextByRow.get(row) === sourceText) return;
 
     // If we already successfully translated this exact text for this row, skip.
-    if (lastSourceTextTranslatedByRow.get(row) === text) return;
+    if (lastSourceTextTranslatedByRow.get(row) === sourceText) return;
 
-    inFlightSourceTextByRow.set(row, text);
-    translateQueue.push({ row, text, attempts: 0 });
+    inFlightSourceTextByRow.set(row, sourceText);
+    translateQueue.push({
+      row,
+      sourceText,
+      toTranslate: payload.toTranslate,
+      emotes: payload.emotes || new Map(),
+      attempts: 0,
+    });
     pumpTranslateQueue();
   }
 
@@ -200,21 +320,21 @@
     translateActive += 1;
 
     try {
-      const { row, text } = job;
+      const { row, sourceText, toTranslate, emotes } = job;
 
       if (!row.isConnected) return;
-      if (extractText(row) !== text) return;
+      if (extractText(row) !== sourceText) return;
 
-      const translated = await translateText(text);
+      const translated = await translateText(toTranslate);
 
-      lastSourceTextTranslatedByRow.set(row, text);
+      lastSourceTextTranslatedByRow.set(row, sourceText);
       lastTranslationByRow.set(row, translated);
 
       const scrollEl = findScrollContainer(row);
       const shouldPin = isNearBottom(scrollEl);
 
       const el = ensureTranslationEl(row);
-      el.textContent = translated;
+      renderTranslated(el, translated, emotes);
       applyDisplayMode(row, el);
 
       if (shouldPin) scrollToBottom(scrollEl);
@@ -224,13 +344,17 @@
         // Backoff for transient errors/rate limits.
         await sleep(800 * job.attempts);
         // Clear inflight marker so it can be re-enqueued.
-        if (inFlightSourceTextByRow.get(job.row) === job.text) {
+        if (inFlightSourceTextByRow.get(job.row) === job.sourceText) {
           inFlightSourceTextByRow.delete(job.row);
         }
-        enqueueTranslation(job.row, job.text);
+        enqueueTranslation(job.row, {
+          sourceText: job.sourceText,
+          toTranslate: job.toTranslate,
+          emotes: job.emotes,
+        });
       }
     } finally {
-      if (inFlightSourceTextByRow.get(job.row) === job.text) {
+      if (inFlightSourceTextByRow.get(job.row) === job.sourceText) {
         inFlightSourceTextByRow.delete(job.row);
       }
       translateActive -= 1;
@@ -240,8 +364,9 @@
   }
 
   function handleRow(row) {
-    const text = extractText(row);
-    if (!text) return;
+    const payload = buildTranslationPayload(row);
+    if (!payload?.sourceText) return;
+    const text = payload.sourceText;
 
     const prevText = lastTextByRow.get(row);
     // If we already translated this exact text for this row, we can skip.
@@ -252,7 +377,7 @@
     // eslint-disable-next-line no-console
     console.log("[TCT]", text);
 
-    enqueueTranslation(row, text);
+    enqueueTranslation(row, payload);
   }
 
   function closestMessageRow(fromNode) {
