@@ -69,3 +69,7 @@ To keep translating on-device and only send DeepL the languages Chrome can't han
 - The toolbar icon shows **✓** when the translator is on, **×** when it's off, and **!** when DeepL has a problem (hover it for details); the popup tells you what's happening in the current tab
 - With DeepL, messages the extension is sure are already in your language are never sent, which saves your quota; your API key is stored only on this computer, never synced
 - No tracking, no analytics
+
+## License
+
+[MIT](LICENSE)
