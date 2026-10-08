@@ -169,13 +169,15 @@
     const navigated = location.href !== lastHref;
     lastHref = location.href;
     if (navigated) local.resetLanguageHistory();
-    if (navigated || !root?.isConnected || !root.querySelector(dom.SEL.row)) attach();
+    // Chat add-ons like 7TV load after the page and hide Twitch's chat: follow the visible one.
+    if (navigated || !dom.isVisible(root) || !root.querySelector(dom.SEL.row)) attach();
     sweep();
   }
 
   function attach() {
     const chat = dom.findChat();
     if (!chat || chat.root === root) return; // No messages yet: keep what we have.
+    if (root) clearAllRows(); // Translations in a chat we stop watching would never update.
     detach();
     root = chat.root;
     scroller = chat.scroller;

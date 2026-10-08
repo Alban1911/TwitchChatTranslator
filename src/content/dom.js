@@ -1,10 +1,13 @@
 // Twitch chat DOM: finding the chat, reading messages and showing translations.
+// Handles Twitch's own chat (live and VOD) and the 7TV extension's chat, which hides Twitch's
+// chat and draws its own. BetterTTV and FrankerFaceZ keep Twitch's markup.
 (() => {
   const TCT = (globalThis.TCT = globalThis.TCT || {});
 
   const LIVE_ROW = 'div.chat-line__message[data-a-target="chat-line-message"]';
   // VOD/replay rows. This class is more stable than the generated Layout-sc-* wrappers.
   const VOD_ROW = "div.video-chat__message";
+  const SEVENTV_ROW = "div.seventv-message";
 
   const TRANSLATION_CLASS = "tct-translation";
   const HIDDEN_ATTR = "data-tct-hidden";
@@ -14,15 +17,19 @@
   const NO_GESTURE_ATTR = "data-tct-no-gesture";
 
   const SEL = Object.freeze({
-    row: `${LIVE_ROW}, ${VOD_ROW}`,
+    row: `${LIVE_ROW}, ${VOD_ROW}, ${SEVENTV_ROW}`,
     liveRow: LIVE_ROW,
     vodRow: VOD_ROW,
+    sevenTvRow: SEVENTV_ROW,
     liveBody: '[data-a-target="chat-line-message-body"]',
-    textFragment: '[data-a-target="chat-message-text"], .text-fragment',
-    mention: '[data-a-target="chat-message-mention"], .mention-fragment',
+    sevenTvBody: ".seventv-chat-message-body",
+    textFragment: '[data-a-target="chat-message-text"], .text-fragment, .text-token',
+    mention: '[data-a-target="chat-message-mention"], .mention-fragment, .mention-token',
     link: "a[href]",
-    // Never read from these: BTTV/Twitch tooltips (they contain extra text), usernames, badges,
-    // and anything we injected ourselves.
+    // 7TV wraps emotes (and zero-width emotes stacked on them) in a box; keep the whole box.
+    emoteBox: ".seventv-emote-box",
+    // Never read from these: tooltips (they contain extra text), usernames, badges, reply
+    // headers, hover buttons, and anything we injected ourselves.
     skip: [
       ".bttv-tooltip",
       "[role='tooltip']",
@@ -30,6 +37,9 @@
       ".chat-badge",
       "[data-a-target='chat-message-username']",
       ".video-chat__message-author",
+      ".seventv-chat-user",
+      ".seventv-reply-part",
+      ".seventv-chat-message-buttons",
       `.${TRANSLATION_CLASS}`,
     ].join(", "),
     messageContainer: '[data-test-selector="chat-scrollable-area__message-container"]',
@@ -125,10 +135,18 @@
     return node?.nodeType === Node.ELEMENT_NODE && node.classList.contains(TRANSLATION_CLASS);
   }
 
+  /** Rendered by CSS (not display:none, visibility:hidden...), whether or not it's scrolled into view. */
+  function isVisible(el) {
+    if (!el?.isConnected) return false;
+    if (typeof el.checkVisibility === "function") return el.checkVisibility({ visibilityProperty: true });
+    return el.getClientRects().length > 0;
+  }
+
   // ---- Reading messages ---------------------------------------------------------
 
   /** The element holding the message itself (no username, badges or timestamp). */
   function getMessageBody(row) {
+    if (row.matches(SEL.sevenTvRow)) return row.querySelector(SEL.sevenTvBody); // System notices have none.
     if (row.matches(SEL.liveRow)) {
       const body = row.querySelector(SEL.liveBody);
       if (body) return body;
@@ -150,6 +168,11 @@
         continue;
       }
       if (child.nodeType !== Node.ELEMENT_NODE || child.matches(SEL.skip)) continue;
+      if (child.matches(SEL.emoteBox)) {
+        const label = Array.from(child.querySelectorAll("img[alt]"), (img) => img.alt.trim()).filter(Boolean).join(" ");
+        if (label) parts.push({ type: "emote", label, node: child.cloneNode(true) });
+        continue;
+      }
       if (child.tagName === "IMG") {
         const label = (child.getAttribute("alt") || "").trim();
         if (label && (child.getAttribute("src") || child.getAttribute("srcset"))) {
@@ -311,8 +334,10 @@
 
   /** The element to observe for new messages, and the scroll container to keep pinned. */
   function findChat() {
-    const row = document.querySelector(SEL.row);
-    if (!row) return null;
+    const rows = document.querySelectorAll(SEL.row);
+    if (!rows.length) return null;
+    // Follow the chat the user can see: 7TV keeps Twitch's own chat in the page, hidden.
+    const row = Array.prototype.find.call(rows, isVisible) || rows[0];
     const scroller = findScroller(row);
     return { root: scroller || row.closest(SEL.messageContainer) || row.parentElement, scroller };
   }
@@ -372,6 +397,7 @@
     closestRow,
     isOwnNode,
     isTranslationElement,
+    isVisible,
     readMessage,
     renderTranslation,
     removeTranslation,
