@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Twitch Chat Translator",
-  "version": "0.2.0",
-  "description": "Translates live Twitch chat messages to a selected language.",
-  "permissions": ["storage"],
+  "version": "0.3.0",
+  "description": "Translates live Twitch chat on your device with Chrome's built-in translator, or with DeepL.",
+  "permissions": ["storage", "scripting"],
   "host_permissions": [
     "https://www.twitch.tv/*",
     "https://api-free.deepl.com/*",
@@ -16,8 +16,8 @@
     "128": "icon.png"
   },
   "action": {
-    "default_title": "TCT Extractor",
-    "default_popup": "popup.html",
+    "default_title": "Twitch Chat Translator",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icon.png",
       "32": "icon.png",
@@ -25,17 +25,22 @@
       "128": "icon.png"
     }
   },
-  "options_page": "options.html",
+  "options_page": "src/options/options.html",
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background/service-worker.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://www.twitch.tv/*", "https://www.twitch.tv/popout/*"],
-      "js": ["content.js"],
+      "matches": ["https://www.twitch.tv/*"],
+      "js": [
+        "src/shared/settings.js",
+        "src/content/dom.js",
+        "src/content/local-engine.js",
+        "src/content/deepl-engine.js",
+        "src/content/pipeline.js",
+        "src/content/main.js"
+      ],
       "run_at": "document_idle"
     }
   ]
 }
-
-

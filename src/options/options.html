@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Twitch Chat Translator Options</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #111;
+        --muted: #666;
+        --bg: #fff;
+        --card: #fff;
+        --border: #ddd;
+        --accent: #111;
+        --ok: #0f7b0f;
+        --error: #b3261e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #efeff1;
+          --muted: #a1a1aa;
+          --bg: #0e0e10;
+          --card: #18181b;
+          --border: #3f3f46;
+          --accent: #9147ff;
+          --ok: #5fd35f;
+          --error: #ff8a80;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      }
+      .wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      h2 {
+        margin: 0 0 12px;
+        font-size: 15px;
+      }
+      .lead {
+        margin: 0 0 16px;
+        color: var(--muted);
+      }
+      .card {
+        margin: 14px 0;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 12px 16px;
+        align-items: center;
+      }
+      @media (max-width: 560px) {
+        .grid {
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+      }
+      .grid > label {
+        font-weight: 600;
+      }
+      input[type="text"],
+      input[type="password"],
+      select,
+      textarea {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--fg);
+        font: inherit;
+      }
+      textarea {
+        min-height: 64px;
+        resize: vertical;
+      }
+      .check {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        margin: 10px 0;
+      }
+      .check input {
+        margin-top: 4px;
+      }
+      .engines {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      @media (max-width: 560px) {
+        .engines {
+          grid-template-columns: 1fr;
+        }
+      }
+      .engine {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .engine:has(input:checked) {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent);
+      }
+      .engine input {
+        margin-top: 4px;
+      }
+      .engine strong {
+        display: block;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .key-row {
+        display: flex;
+        gap: 8px;
+      }
+      button {
+        padding: 8px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: transparent;
+        color: var(--fg);
+        font: inherit;
+        cursor: pointer;
+      }
+      button.primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+      button:disabled {
+        cursor: progress;
+        opacity: 0.6;
+      }
+      .pill {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 999px;
+        border: 1px solid currentColor;
+        font-size: 12px;
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .error {
+        color: var(--error);
+      }
+      .status {
+        min-height: 1.5em;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .result {
+        margin-top: 10px;
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+      }
+      details summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      details ol {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      #saved {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 13px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      #saved.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Twitch Chat Translator</h1>
+      <p class="lead">Changes are saved automatically.</p>
+
+      <section class="card">
+        <h2>Translation</h2>
+        <label class="check">
+          <input id="enabled" type="checkbox" />
+          <span>Translate Twitch chat <span class="muted">(also available from the toolbar button)</span></span>
+        </label>
+
+        <div class="engines" role="radiogroup" aria-label="Translation engine">
+          <label class="engine">
+            <input type="radio" name="engine" value="local" />
+            <span>
+              <strong>On-device</strong>
+              <span class="muted">Chrome's built-in translator. Free, private, works offline. Each language is a
+                one-time download.</span>
+              <span id="localSupport" class="muted"></span>
+            </span>
+          </label>
+          <label class="engine">
+            <input type="radio" name="engine" value="deepl" />
+            <span>
+              <strong>DeepL</strong>
+              <span class="muted">Better with slang and rare languages. Needs a DeepL API key (the free plan includes
+                500,000 characters a month).</span>
+            </span>
+          </label>
+        </div>
+
+        <div class="grid">
+          <label for="targetLang">Translate into</label>
+          <select id="targetLang"></select>
+
+          <label for="displayMode">Show translations</label>
+          <select id="displayMode">
+            <option value="under">Under the original message</option>
+            <option value="replace">Instead of the original (hover to see it)</option>
+          </select>
+        </div>
+
+        <label class="check">
+          <input id="showSourceLang" type="checkbox" />
+          <span>Show the original language before each translation (for example <span class="pill">ES</span>)</span>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>DeepL</h2>
+        <div class="grid">
+          <label for="deeplAuthKey">API key</label>
+          <div>
+            <div class="key-row">
+              <input id="deeplAuthKey" type="password" autocomplete="off" spellcheck="false" placeholder="Your DeepL authentication key" />
+              <button id="toggleKey" type="button">Show</button>
+            </div>
+            <div id="keyInfo" class="muted"></div>
+          </div>
+        </div>
+
+        <label class="check">
+          <input id="deeplFallback" type="checkbox" />
+          <span>When using the on-device engine, send messages in languages it doesn't support to DeepL</span>
+        </label>
+
+        <details>
+          <summary>How to get a free DeepL API key</summary>
+          <ol class="muted">
+            <li>Create an account and pick <b>DeepL API Free</b>:
+              <a href="https://www.deepl.com/pro-api" target="_blank" rel="noreferrer">deepl.com/pro-api</a>.</li>
+            <li>Open your account page, then <b>API keys &amp; limits</b>, and copy your key.</li>
+            <li>Paste it above. Free keys end in <code>:fx</code>; the extension picks the right server for you.</li>
+          </ol>
+          <p class="muted">The key is stored only on this device. If it ever leaks, create a new one in your DeepL
+            account and replace it here.</p>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2>Try it</h2>
+        <textarea id="testText">¡Hola a todos! ¿Qué tal el directo de hoy?</textarea>
+        <div class="key-row" style="margin-top: 10px; align-items: center">
+          <button id="test" class="primary" type="button">Translate</button>
+          <span id="testStatus" class="status"></span>
+        </div>
+        <div id="testResult" class="result"></div>
+      </section>
+
+      <section class="card">
+        <h2>Troubleshooting</h2>
+        <label class="check">
+          <input id="debug" type="checkbox" />
+          <span>Log what the extension does to the Twitch tab's DevTools console (lines start with
+            <code>[TCT]</code>)</span>
+        </label>
+      </section>
+    </div>
+
+    <div id="saved" role="status">Saved</div>
+
+    <script src="../shared/settings.js"></script>
+    <script src="../content/local-engine.js"></script>
+    <script src="../content/deepl-engine.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

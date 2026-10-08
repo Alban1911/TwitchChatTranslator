@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Twitch Chat Translator</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #111;
+        --muted: #666;
+        --bg: #fff;
+        --border: #d4d4d8;
+        --accent: #111;
+        --error: #b3261e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #efeff1;
+          --muted: #a1a1aa;
+          --bg: #18181b;
+          --border: #3f3f46;
+          --accent: #9147ff;
+          --error: #ff8a80;
+        }
+      }
+      body {
+        width: 260px;
+        margin: 0;
+        padding: 12px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .title {
+        font-weight: 600;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      /* Toggle switch */
+      .switch {
+        position: relative;
+        display: inline-block;
+        flex: none;
+        width: 44px;
+        height: 24px;
+      }
+      .switch input {
+        width: 0;
+        height: 0;
+        opacity: 0;
+      }
+      .slider {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #a1a1aa;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .slider::before {
+        position: absolute;
+        left: 3px;
+        bottom: 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: #fff;
+        content: "";
+        transition: transform 0.2s;
+      }
+      input:checked + .slider {
+        background: var(--accent);
+      }
+      input:checked + .slider::before {
+        transform: translateX(20px);
+      }
+      input:focus-visible + .slider {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      label.field {
+        display: block;
+        margin: 10px 0 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      select {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--fg);
+        font: inherit;
+      }
+      .status {
+        min-height: 2.8em;
+        margin: 12px 0 0;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .status.error {
+        border-color: var(--error);
+        color: var(--error);
+      }
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+      }
+      a {
+        color: inherit;
+      }
+      .saved {
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="grow">
+        <div class="title">Translator</div>
+        <div id="enabledLabel" class="sub">Off</div>
+      </div>
+      <label class="switch" title="Turn the translator on or off">
+        <input id="enabled" type="checkbox" aria-label="Translator on or off" />
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <label class="field" for="engine">Engine</label>
+    <select id="engine">
+      <option value="local">On-device (free, private)</option>
+      <option value="deepl">DeepL (API key)</option>
+    </select>
+
+    <label class="field" for="targetLang">Translate into</label>
+    <select id="targetLang"></select>
+
+    <label class="field" for="displayMode">Show translations</label>
+    <select id="displayMode">
+      <option value="under">Under the original</option>
+      <option value="replace">Instead of the original</option>
+    </select>
+
+    <p id="status" class="status" role="status"></p>
+
+    <div class="footer">
+      <a id="openOptions" href="#">Options…</a>
+      <span id="saved" class="saved"></span>
+    </div>
+
+    <script src="../shared/settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
