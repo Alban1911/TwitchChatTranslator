@@ -66,11 +66,18 @@ async function refreshStatus() {
     }
   }
   if (!status.chatFound) return setStatus("Waiting for chat messages…");
-  const count = pipeline?.translated || 0;
+  const shown = status.shown || 0;
+  if (!shown && (pipeline?.translated || 0) > 2) {
+    return setStatus(
+      "Messages are translated but none show up on the page. Another chat extension may be drawing the chat " +
+        "(7TV, BetterTTV and FrankerFaceZ are supported). Turn on debug logging in Options to see more.",
+      { error: true }
+    );
+  }
   const engine = s.engine === "local" ? "on-device" : "DeepL";
   setStatus(
-    count
-      ? `Translating with ${engine} · ${count} message${count === 1 ? "" : "s"} so far.`
+    shown
+      ? `Translating with ${engine} · ${shown} message${shown === 1 ? "" : "s"} so far.`
       : `Translating with ${engine}. Messages already in your language are left alone.`
   );
 }

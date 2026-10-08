@@ -31,6 +31,7 @@
   let lastHref = location.href;
   let unsubscribeSettings = null;
   let dismissedToast = "";
+  let shownCount = 0; // Translations that ended up visible on the page.
 
   /** row → { signature, message, result, el, status: "pending" | "deferred" | "dropped" | "skipped" | "done" } */
   let rowStates = new WeakMap();
@@ -139,6 +140,7 @@
     local.destroy();
     pipeline = local = deepl = null;
     clearAllRows();
+    shownCount = 0;
     dom.hideToast();
     log("stopped");
   }
@@ -306,14 +308,22 @@
     // make rows taller after the fact, so re-pin the chat if it was at the bottom before.
     const pin = !!scroller?.isConnected && dom.isNearBottom(scroller);
     const options = { mode: settings.displayMode, showSourceLang: settings.showSourceLang, targetLang: settings.targetLang };
+    const firstShown = [];
     for (const row of rowsToRender) {
       const state = rowStates.get(row);
       if (!state?.result || !row.isConnected) continue;
       state.el = dom.renderTranslation(row, state.message, state.result, state.el, options);
       renderedRows.add(row);
+      if (!state.shown) firstShown.push(state);
     }
     rowsToRender.clear();
     if (pin) dom.scrollToBottom(scroller);
+    // Count what the user can actually see (reads after all writes, to avoid layout thrashing).
+    for (const state of firstShown) {
+      if (!dom.isVisible(state.el)) continue;
+      state.shown = true;
+      shownCount += 1;
+    }
   }
 
   function clearRow(row) {
@@ -399,6 +409,8 @@
       running,
       engine: settings?.engine,
       chatFound: !!root?.isConnected,
+      chatVisible: dom.isVisible(root),
+      shown: shownCount,
       local: local ? local.getStatus() : { supported: TCT.isLocalSupported(), needsGesture: [], downloading: [], failed: [] },
       pipeline: pipeline ? pipeline.getStatus() : null,
     };
